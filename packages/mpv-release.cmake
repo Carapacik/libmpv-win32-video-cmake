@@ -21,26 +21,18 @@ ExternalProject_Add(mpv-release
         lcms2
         libarchive
         libass
-        libdvdnav
-        libdvdread
         libiconv
         libjpeg
         libpng
-        luajit
-        rubberband
         uchardet
-        openal-soft
-        mujs
         vulkan
         shaderc
         libplacebo
         spirv-cross
-        vapoursynth
         libsdl2
-        subrandr
-        libsixel
     URL ${LINK}
     SOURCE_DIR ${SOURCE_LOCATION}
+    PATCH_COMMAND bash -c "git apply --check ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-remove-angle-d3d9-renderer.patch && git apply ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-remove-angle-d3d9-renderer.patch || git apply --reverse --check ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-remove-angle-d3d9-renderer.patch"
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
@@ -54,23 +46,23 @@ ExternalProject_Add(mpv-release
         ${mpv_lto_mode}
         -Dlibmpv=true
         -Dpdf-build=enabled
-        -Dlua=enabled
-        -Djavascript=enabled
+        -Dlua=disabled
+        -Djavascript=disabled
         -Dsdl2-gamepad=enabled
         -Dlibarchive=enabled
-        -Dlibbluray=enabled
-        -Ddvdnav=enabled
+        -Dlibbluray=disabled
+        -Ddvdnav=disabled
         -Duchardet=enabled
-        -Drubberband=enabled
+        -Drubberband=disabled
         -Dlcms2=enabled
-        -Dopenal=enabled
-        -Dspirv-cross=enabled
-        -Dvulkan=enabled
-        -Dvapoursynth=enabled
-        -Dsubrandr=enabled
-        -Dsixel=enabled
+        -Dopenal=disabled
+        -Dspirv-cross=disabled
+        -Dvulkan=disabled
+        -Dvapoursynth=disabled
+        -Dsixel=disabled
         ${mpv_gl}
         -Dc_args='-Wno-error=int-conversion'
+        -Dgpl=false
     BUILD_COMMAND ${EXEC} LTO_JOB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
