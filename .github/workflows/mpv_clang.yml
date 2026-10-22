@@ -127,6 +127,9 @@ jobs:
 
       - name: Configuring CMake & Downloading source
         run: |
+          # Reapply the current patch set even when restoring an older build cache.
+          rm -rf src_packages/mpv build_$BIT/packages/mpv-prefix
+          rm -rf build_$BIT/packages/mpv-package build_$BIT/packages/mpv-dev build_$BIT/packages/mpv-debug
           cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang ${{ env.x86_64_v3_ARCH }} -DCMAKE_INSTALL_PREFIX=$PWD/clang_root -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 -DSINGLE_SOURCE_LOCATION=$PWD/src_packages -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup -DENABLE_CCACHE=ON -DCLANG_PACKAGES_LTO=ON -G Ninja --fresh -B build_$BIT -S $PWD
           ninja -C build_$BIT download || true
 
@@ -136,13 +139,38 @@ jobs:
           MPV_TARBALL: ${{ inputs.mpv_tarball || false }}
         run: |
           ninja -C build_$BIT update
-          $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
-          $MPV_TARBALL && echo "mpv_ver=$(cat build_$BIT/packages/mpv-release-prefix/VERSION)" >> $GITHUB_OUTPUT || echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
+          mkdir -p build_${BIT}_logs
+          if $MPV_TARBALL; then
+            ninja -C build_$BIT mpv-release
+            echo "mpv_ver=$(cat build_$BIT/packages/mpv-release-prefix/VERSION)" >> $GITHUB_OUTPUT
+          else
+            ninja -C build_$BIT mpv-patch
+            git -C src_packages/mpv apply --reverse --check "$PWD"/packages/mpv-*.patch
+            git -C src_packages/mpv diff --check
+            git -C src_packages/mpv diff > build_${BIT}_logs/mpv-patches.diff
+            {
+              printf 'Build repository: %s\n' "$(git rev-parse HEAD)"
+              printf 'Workflow: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+              for source in src_packages/*; do
+                if [[ -d "$source/.git" ]]; then
+                  printf '%s %s\n' "${source##*/}" "$(git -C "$source" rev-parse HEAD)"
+                fi
+              done
+              sha256sum packages/mpv-*.patch src_packages/mpv/video/out/opengl/hwdec_d3d11egl.c
+            } | tee build_${BIT}_logs/build-info.txt
+            ninja -C build_$BIT mpv
+            echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
+          fi
 
       - name: Packaging mpv
         run: |
           mkdir -p release_$BIT
           ninja -C build_$BIT mpv-packaging; mv build_$BIT/mpv*.7z release_$BIT
+          sha256sum build_$BIT/mpv-dev-*/libmpv-2.dll > build_${BIT}_logs/libmpv-SHA256SUMS
+          (cd release_$BIT && sha256sum mpv-"$arch"*.7z mpv-dev-"$arch"*.7z) > release_$BIT/SHA256SUMS-$BIT
+          if [[ -f build_${BIT}_logs/build-info.txt ]]; then
+            cat build_${BIT}_logs/build-info.txt build_${BIT}_logs/libmpv-SHA256SUMS > release_$BIT/build-info-$BIT.txt
+          fi
 
       - name: Collecting logs
         if: always()
@@ -166,6 +194,8 @@ jobs:
           path: |
             release_${{ matrix.bit }}/mpv-${{ env.arch }}*.7z
             release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*.7z
+            release_${{ matrix.bit }}/SHA256SUMS-*
+            release_${{ matrix.bit }}/build-info-*.txt
 
       - name: Uploading ${{ matrix.bit }} debug
         uses: actions/upload-artifact@master

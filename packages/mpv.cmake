@@ -19,7 +19,7 @@ ExternalProject_Add(mpv
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
-    PATCH_COMMAND ${EXEC} git apply ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-remove-angle-d3d9-renderer.patch
+    PATCH_COMMAND ${EXEC} git apply ${CMAKE_CURRENT_SOURCE_DIR}/mpv-*.patch
     GIT_TAG v0.41.0
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
@@ -105,5 +105,6 @@ ExternalProject_Add_Step(mpv copy-package-dir
 )
 
 force_rebuild_git(mpv)
+ExternalProject_Add_StepTargets(mpv patch)
 force_meson_configure(mpv)
 cleanup(mpv copy-package-dir)
